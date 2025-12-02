@@ -51,7 +51,7 @@ func main() {
 		turns = append(turns, t)
 	}
 
-	position := 0
+	position := 50
 	clicks := 0
 
 	for _, t := range turns {
@@ -68,15 +68,17 @@ func main() {
 		}
 
 		if interval == 0 {
-			fmt.Println("skip")
 			continue
 		}
 
+		startedAt0 := position == 0
 		position = position + interval
 
 		if position < 0 {
 			position = 100 + position
-			clicks++
+			if !startedAt0 {
+				clicks++
+			}
 		} else if position > 99 {
 			position = position - 100
 			clicks++
