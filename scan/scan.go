@@ -1,6 +1,15 @@
 package scan
 
-import "strconv"
+import (
+	"regexp"
+	"strconv"
+)
+
+// Strings scans for contiguous sections of non whitespace
+func Strings(input string) []string {
+	exp := regexp.MustCompile(`\S`)
+	return exp.FindAllString(input, -1)
+}
 
 // Numbers scans for contiguous sections of numbers in a string
 func Numbers(input string) []int {
