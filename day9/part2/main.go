@@ -3,29 +3,17 @@ package main
 import (
 	"aoc25/scan"
 	"fmt"
-	"math"
 	"os"
+	"slices"
 	"strings"
 )
 
-type Vec2 struct {
-	X int
-	Y int
-}
-
-type TileGrid map[int]map[int]bool
-
-func (tg TileGrid) Add(v Vec2) {
-	m, ok := tg[v.X]
-	if !ok {
-		m = map[int]bool{}
-		tg[v.X] = m
-	}
-	tg[v.X][v.Y] = true
-}
-
 type Tile struct {
 	Pos Vec2
+}
+
+type Vec2 struct {
+	X, Y int
 }
 
 func main() {
@@ -43,68 +31,64 @@ func main() {
 
 	for _, line := range lines {
 		nums := scan.Numbers(line)
-		t := Tile{
+		tiles = append(tiles, Tile{
+			Pos: Vec2{nums[0], nums[1]},
+		})
+	}
+
+	// unique x and y
+	ux := map[int]struct{}{}
+	uy := map[int]struct{}{}
+
+	for _, t := range tiles {
+		ux[t.Pos.X] = struct{}{}
+		uy[t.Pos.Y] = struct{}{}
+	}
+
+	xs := []int{}
+	ys := []int{}
+
+	for k := range ux {
+		xs = append(xs, k)
+	}
+	for k := range uy {
+		ys = append(ys, k)
+	}
+
+	slices.Sort(xs)
+	slices.Sort(ys)
+
+	xlookup := map[int]int{}
+	ylookup := map[int]int{}
+
+	start := 1
+	for _, x := range xs {
+		xlookup[x] = start
+		start++
+	}
+
+	start = 1
+	for _, y := range ys {
+		ylookup[y] = start
+		start++
+	}
+
+	for i, t := range tiles {
+		tiles[i] = Tile{
 			Pos: Vec2{
-				X: nums[0],
-				Y: nums[1],
+				X: xlookup[t.Pos.X],
+				Y: ylookup[t.Pos.Y],
 			},
 		}
-		tiles = append(tiles, t)
 	}
 
-	minX := math.MaxInt
-	minY := math.MaxInt
-	maxX := 0
-	maxY := 0
-
-	for _, tile := range tiles {
-		if tile.Pos.X < minX {
-			minX = tile.Pos.X
-		}
-		if tile.Pos.X > maxX {
-			maxX = tile.Pos.X
-		}
-		if tile.Pos.Y < minY {
-			minY = tile.Pos.Y
-		}
-		if tile.Pos.Y > maxY {
-			maxY = tile.Pos.Y
-		}
-	}
-
-	grid := make(TileGrid)
-
-	for i, tile := range tiles[:len(tiles)-1] {
-		nextTile := tiles[i+1]
-
-		grid.Add(tile.Pos)
-		grid.Add(nextTile.Pos)
-
-		if tile.Pos.X == nextTile.Pos.X {
-			end := max(tile.Pos.Y, nextTile.Pos.Y)
-			start := min(tile.Pos.Y, nextTile.Pos.Y)
-
-			for i := start + 1; i < end; i++ {
-				grid.Add(Vec2{X: tile.Pos.X, Y: i})
-			}
-		} else if tile.Pos.Y == nextTile.Pos.Y {
-			end := max(tile.Pos.Y, nextTile.Pos.Y)
-			start := min(tile.Pos.Y, nextTile.Pos.Y)
-
-			for i := start + 1; i < end; i++ {
-				grid.Add(Vec2{X: tile.Pos.X, Y: i})
-			}
-		} else {
-			panic("impossible tile ordering")
-		}
-	}
-
-	fmt.Println(minX, minY, maxX, maxY)
+	fmt.Println(tiles)
+	// at this point the tiles are compressed correctly?
 }
 
-func Area(t1, t2 Tile) int {
-	x := Abs(t1.Pos.X-t2.Pos.X) + 1
-	y := Abs(t1.Pos.Y-t2.Pos.Y) + 1
+func Area(v1, v2 Vec2) int {
+	x := Abs(v1.X-v2.X) + 1
+	y := Abs(v1.Y-v2.Y) + 1
 
 	result := x * y
 	if result < 0 {
