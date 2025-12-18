@@ -2,6 +2,7 @@ package main
 
 import (
 	"aoc25/scan"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -73,15 +74,20 @@ func main() {
 	xlookup := map[int]int{}
 	ylookup := map[int]int{}
 
+	xlookupInverse := map[int]int{}
+	ylookupInverse := map[int]int{}
+
 	start := 1
 	for _, x := range xs {
 		xlookup[x] = start
+		xlookupInverse[start] = x
 		start++
 	}
 
 	start = 1
 	for _, y := range ys {
 		ylookup[y] = start
+		ylookupInverse[start] = y
 		start++
 	}
 
@@ -155,6 +161,45 @@ func main() {
 
 	_ = inside
 	Bfs(grid, inside)
+
+	largestArea := 0
+
+outer:
+	for i, redTile := range redTiles[:len(redTiles)-1] {
+		nextRedTile := redTiles[i+1]
+
+		minX := min(redTile.Pos.X, nextRedTile.Pos.X)
+		minY := min(redTile.Pos.Y, nextRedTile.Pos.Y)
+		maxX := max(redTile.Pos.X, nextRedTile.Pos.X)
+		maxY := max(redTile.Pos.Y, nextRedTile.Pos.Y)
+
+		for x := minX; x <= maxX; x++ {
+			for y := minY; y <= maxY; y++ {
+				if grid[minY][minX].Color == ColorBlank {
+					fmt.Println("skip")
+					continue outer
+				}
+			}
+		}
+
+		v1 := Vec2{
+			X: xlookupInverse[redTile.Pos.X],
+			Y: ylookupInverse[redTile.Pos.Y],
+		}
+		v2 := Vec2{
+			X: xlookupInverse[nextRedTile.Pos.X],
+			Y: ylookupInverse[nextRedTile.Pos.Y],
+		}
+
+		area := Area(v1, v2)
+		if area > largestArea {
+			largestArea = area
+		}
+	}
+
+	// 92808 too low
+	fmt.Println(largestArea)
+
 	Draw(grid)
 }
 
