@@ -112,6 +112,18 @@ func main() {
 		grid[i] = make([]Tile, largestX)
 	}
 
+	for y, row := range grid {
+		for x := range row {
+			grid[y][x] = Tile{
+				Pos: Vec2{
+					X: x,
+					Y: y,
+				},
+				Color: ColorBlank,
+			}
+		}
+	}
+
 	for _, t := range redTiles {
 		t.Color = ColorRed
 		grid[t.Pos.Y][t.Pos.X] = t
@@ -123,13 +135,15 @@ func main() {
 	}
 	MakeGreenBetween(grid, redTiles[0], redTiles[len(redTiles)-1])
 
+	var inside Tile
 	for y, row := range grid {
 		found := false
-		for x := range row {
+		for x, t := range row {
 			point := Vec2{X: x, Y: y}
 			hits := CastRay(grid, point)
-			if hits > 0 && hits%2 != 0 {
+			if hits > 0 && hits%2 != 0 && t.Color != ColorRed && t.Color != ColorGreen {
 				found = true
+				inside = grid[y][x]
 				break
 			}
 		}
@@ -139,7 +153,75 @@ func main() {
 		}
 	}
 
+	_ = inside
+	Bfs(grid, inside)
 	Draw(grid)
+}
+
+func Bfs(grid [][]Tile, start Tile) {
+	queue := []Tile{start}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		tile := grid[current.Pos.Y][current.Pos.X]
+		if tile.Color == ColorBlank {
+			grid[tile.Pos.Y][tile.Pos.X].Color = ColorGreen
+		} else {
+			continue
+		}
+		around := Around(grid, current)
+		if len(around) > 0 {
+			queue = append(queue, around...)
+		}
+	}
+}
+
+func Around(grid [][]Tile, t Tile) []Tile {
+	v := t.Pos
+	directions := []Vec2{
+		{-1, 0},
+		{1, 0},
+		{0, -1},
+		{0, 1},
+	}
+
+	adj := []Tile{}
+	for _, d := range directions {
+		other := AddVecs(v, d)
+		if Oob(grid, other) {
+			continue
+		}
+		color := grid[other.Y][other.X].Color
+		if color == ColorGreen || color == ColorRed {
+			continue
+		}
+		adj = append(adj, grid[other.Y][other.X])
+	}
+	return adj
+}
+
+func Oob(grid [][]Tile, v Vec2) bool {
+	if v.X < 0 || v.Y < 0 {
+		return true
+	}
+
+	if v.Y >= len(grid) {
+		return true
+	}
+
+	row := grid[v.Y]
+	if v.X >= len(row) {
+		return true
+	}
+
+	return false
+}
+
+func AddVecs(v1, v2 Vec2) Vec2 {
+	return Vec2{
+		X: v1.X + v2.X,
+		Y: v1.Y + v2.Y,
+	}
 }
 
 func CastRay(grid [][]Tile, start Vec2) int {
@@ -156,6 +238,7 @@ func CastRay(grid [][]Tile, start Vec2) int {
 
 		if currentColored != nextColored {
 			crossCount++
+			i++
 		}
 	}
 
