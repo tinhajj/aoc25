@@ -24,6 +24,8 @@ const (
 	ColorBlank Color = iota
 	ColorRed         = iota
 	ColorGreen
+
+	ColorPurple
 )
 
 type Tile struct {
@@ -36,8 +38,8 @@ type Vec2 struct {
 }
 
 func main() {
-	// b, err := os.ReadFile("day_9_input.txt")
-	b, err := os.ReadFile("day_9_sample_input.txt")
+	b, err := os.ReadFile("day_9_input.txt")
+	// b, err := os.ReadFile("day_9_sample_input.txt")
 	if err != nil {
 		panic(err)
 	}
@@ -188,11 +190,13 @@ func main() {
 	Bfs(grid, inside)
 	Draw(grid)
 
+	var largestV1 Vec2
+	var largestV2 Vec2
 	largestArea := 0
 
-outer:
 	for i, tile1 := range redTiles {
-		for _, tile2 := range redTiles[i:] {
+	outer:
+		for _, tile2 := range redTiles[i+1:] {
 
 			minX := min(tile1.Pos.X, tile2.Pos.X)
 			minY := min(tile1.Pos.Y, tile2.Pos.Y)
@@ -218,6 +222,8 @@ outer:
 
 			area := Area(v1, v2)
 			if area > largestArea {
+				largestV1 = tile1.Pos
+				largestV2 = tile2.Pos
 				largestArea = area
 			}
 		}
@@ -225,7 +231,21 @@ outer:
 
 	// 92808 too low
 	// 113979918 too low
+	Draw(grid)
+
 	fmt.Println(largestArea)
+	fmt.Println(largestV1, largestV2)
+
+	minX := min(largestV1.X, largestV2.X)
+	minY := min(largestV1.Y, largestV2.Y)
+	maxX := max(largestV1.X, largestV2.X)
+	maxY := max(largestV1.Y, largestV2.Y)
+
+	for x := minX; x <= maxX; x++ {
+		for y := minY; y <= maxY; y++ {
+			grid[y][x].Color = ColorPurple
+		}
+	}
 
 	Draw(grid)
 }
@@ -356,6 +376,8 @@ func Draw(grid [][]Tile) {
 				img.Set(x, y, color.RGBA{R: 255, G: 0, A: 255})
 			case ColorGreen:
 				img.Set(x, y, color.RGBA{R: 0, G: 255, A: 255})
+			case ColorPurple:
+				img.Set(x, y, color.RGBA{R: 255, B: 255, A: 255})
 			}
 			// Set the pixel color using a color.RGBA struct
 		}
