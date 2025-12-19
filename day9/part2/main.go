@@ -7,10 +7,16 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"math/rand"
 	"os"
 	"slices"
 	"strings"
 )
+
+type Segment struct {
+	Start Vec2
+	End   Vec2
+}
 
 type Color int
 
@@ -30,8 +36,8 @@ type Vec2 struct {
 }
 
 func main() {
-	b, err := os.ReadFile("day_9_input.txt")
-	// b, err := os.ReadFile("day_9_sample_input.txt")
+	// b, err := os.ReadFile("day_9_input.txt")
+	b, err := os.ReadFile("day_9_sample_input.txt")
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +51,8 @@ func main() {
 	for _, line := range lines {
 		nums := scan.Numbers(line)
 		redTiles = append(redTiles, Tile{
-			Pos: Vec2{nums[0], nums[1]},
+			Color: ColorRed,
+			Pos:   Vec2{nums[0], nums[1]},
 		})
 	}
 
@@ -96,6 +103,7 @@ func main() {
 
 	for i, t := range redTiles {
 		redTiles[i] = Tile{
+			Color: ColorRed,
 			Pos: Vec2{
 				X: xlookup[t.Pos.X],
 				Y: ylookup[t.Pos.Y],
@@ -135,18 +143,36 @@ func main() {
 		grid[t.Pos.Y][t.Pos.X] = t
 	}
 
+	verticalSegments := []Segment{}
+
 	for i, tile := range redTiles[:len(redTiles)-1] {
 		nextTile := redTiles[i+1]
 		MakeGreenBetween(grid, tile, nextTile)
+		if tile.Pos.X == nextTile.Pos.X {
+			verticalSegments = append(verticalSegments, Segment{
+				Start: tile.Pos,
+				End:   nextTile.Pos,
+			})
+		}
 	}
 	MakeGreenBetween(grid, redTiles[0], redTiles[len(redTiles)-1])
+	if redTiles[0].Pos.X == redTiles[len(redTiles)-1].Pos.X {
+		verticalSegments = append(verticalSegments, Segment{
+			Start: redTiles[0].Pos,
+			End:   redTiles[len(redTiles)-1].Pos,
+		})
+	}
+	Draw(grid)
 
 	var inside Tile
 	for y, row := range grid {
 		found := false
 		for x, t := range row {
-			point := Vec2{X: x, Y: y}
-			hits := CastRay(grid, point)
+			if t.Pos.X == 0 && t.Pos.Y == 2 {
+				// continue
+				_ = rand.Intn(3)
+			}
+			hits := CastRay(grid, verticalSegments, t)
 			if hits > 0 && hits%2 != 0 && t.Color != ColorRed && t.Color != ColorGreen {
 				found = true
 				inside = grid[y][x]
@@ -159,45 +185,46 @@ func main() {
 		}
 	}
 
-	_ = inside
 	Bfs(grid, inside)
+	Draw(grid)
 
 	largestArea := 0
 
 outer:
-	for i, redTile := range redTiles[:len(redTiles)-1] {
-		nextRedTile := redTiles[i+1]
+	for i, tile1 := range redTiles {
+		for _, tile2 := range redTiles[i:] {
 
-		minX := min(redTile.Pos.X, nextRedTile.Pos.X)
-		minY := min(redTile.Pos.Y, nextRedTile.Pos.Y)
-		maxX := max(redTile.Pos.X, nextRedTile.Pos.X)
-		maxY := max(redTile.Pos.Y, nextRedTile.Pos.Y)
+			minX := min(tile1.Pos.X, tile2.Pos.X)
+			minY := min(tile1.Pos.Y, tile2.Pos.Y)
+			maxX := max(tile1.Pos.X, tile2.Pos.X)
+			maxY := max(tile1.Pos.Y, tile2.Pos.Y)
 
-		for x := minX; x <= maxX; x++ {
-			for y := minY; y <= maxY; y++ {
-				if grid[minY][minX].Color == ColorBlank {
-					fmt.Println("skip")
-					continue outer
+			for x := minX; x <= maxX; x++ {
+				for y := minY; y <= maxY; y++ {
+					if grid[y][x].Color == ColorBlank {
+						continue outer
+					}
 				}
 			}
-		}
 
-		v1 := Vec2{
-			X: xlookupInverse[redTile.Pos.X],
-			Y: ylookupInverse[redTile.Pos.Y],
-		}
-		v2 := Vec2{
-			X: xlookupInverse[nextRedTile.Pos.X],
-			Y: ylookupInverse[nextRedTile.Pos.Y],
-		}
+			v1 := Vec2{
+				X: xlookupInverse[tile1.Pos.X],
+				Y: ylookupInverse[tile1.Pos.Y],
+			}
+			v2 := Vec2{
+				X: xlookupInverse[tile2.Pos.X],
+				Y: ylookupInverse[tile2.Pos.Y],
+			}
 
-		area := Area(v1, v2)
-		if area > largestArea {
-			largestArea = area
+			area := Area(v1, v2)
+			if area > largestArea {
+				largestArea = area
+			}
 		}
 	}
 
 	// 92808 too low
+	// 113979918 too low
 	fmt.Println(largestArea)
 
 	Draw(grid)
@@ -269,25 +296,45 @@ func AddVecs(v1, v2 Vec2) Vec2 {
 	}
 }
 
-func CastRay(grid [][]Tile, start Vec2) int {
-	width, _ := len(grid[0]), len(grid)
-
-	crossCount := 0
-
-	for i := start.X; i < width-1; i++ {
-		current := grid[start.Y][i]
-		next := grid[start.Y][i+1]
-
-		currentColored := current.Color == ColorRed || current.Color == ColorGreen
-		nextColored := next.Color == ColorRed || next.Color == ColorGreen
-
-		if currentColored != nextColored {
-			crossCount++
-			i++
-		}
+func CastRay(grid [][]Tile, verticalSegments []Segment, tile Tile) int {
+	hitCount := 0
+	if tile.Color != ColorBlank {
+		return 0
 	}
 
-	return crossCount
+	for _, segment := range verticalSegments {
+		if segment.Start.X < tile.Pos.X {
+			continue
+		}
+		minY := min(segment.Start.Y, segment.End.Y)
+		maxY := max(segment.Start.Y, segment.End.Y)
+
+		if tile.Pos.Y >= minY && tile.Pos.Y < maxY {
+			hitCount++
+		}
+	}
+	return hitCount
+
+	// width, _ := len(grid[0]), len(grid)
+
+	// crossCount := 0
+
+	// for i := start.X; i < width-1; i++ {
+	// 	current := grid[start.Y][i]
+	// 	next := grid[start.Y][i+1]
+
+	// 	currentColored := current.Color == ColorRed || current.Color == ColorGreen
+	// 	nextColored := next.Color == ColorRed || next.Color == ColorGreen
+
+	// 	if nextColored {
+	// 		if currentColored != nextColored {
+	// 			crossCount++
+	// 			i++
+	// 		}
+	// 	}
+	// }
+
+	// return crossCount
 }
 
 func Draw(grid [][]Tile) {
