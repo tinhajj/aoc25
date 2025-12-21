@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -62,5 +64,32 @@ func main() {
 			Lights:  lights,
 			Wirings: wirings,
 		})
+
+	}
+	results := [][]int{}
+	combinations([]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, &results)
+	fmt.Println(len(results))
+}
+
+func combinationsRec(prefix []int, choices []int, skiplist []bool, skipped int, combos *[][]int) {
+	for i, choice := range choices {
+		newPrefix := slices.Clone(prefix)
+		newPrefix = append(newPrefix, choice)
+		*combos = append(*combos, newPrefix)
+
+		newChoices := slices.Clone(choices)
+		newChoices = append(newChoices[:i], newChoices[i+1:]...)
+
+		combinationsRec(newPrefix, newChoices, combos)
+	}
+}
+
+func combinations(bases []int, combos *[][]int) {
+	skiplist := make([]bool, len(bases))
+	for i, b := range bases {
+		*combos = append(*combos, []int{b})
+		skiplist[i] = true
+		combinationsRec([]int{b}, bases, skiplist, i, combos)
+		skiplist[i] = false
 	}
 }
