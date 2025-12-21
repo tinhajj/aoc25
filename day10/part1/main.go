@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"slices"
 	"strconv"
@@ -9,8 +10,8 @@ import (
 )
 
 type Machine struct {
-	Lights  []bool
-	Wirings [][]int
+	LightGoal []bool
+	Wirings   [][]int
 }
 
 func main() {
@@ -25,6 +26,8 @@ func main() {
 	lines = lines[0 : len(lines)-1]
 
 	machines := []Machine{}
+
+	sum := 0
 
 	for _, line := range lines {
 		start := strings.Index(line, "[")
@@ -60,36 +63,67 @@ func main() {
 			wirings = append(wirings, wiring)
 		}
 
-		machines = append(machines, Machine{
-			Lights:  lights,
-			Wirings: wirings,
-		})
+		m := Machine{
+			LightGoal: lights,
+			Wirings:   wirings,
+		}
+		machines = append(machines, m)
 
+		bases := make([]int, len(m.Wirings))
+		for i := range bases {
+			bases[i] = i
+		}
+
+		sets := subsets(bases)
+		shortest := math.MaxInt
+		for _, s := range sets {
+			ok, size := solve(m, s)
+			if ok && size < shortest {
+				shortest = size
+			}
+		}
+		sum += shortest
 	}
+	fmt.Println(sum)
+}
+
+func solve(m Machine, choices []int) (bool, int) {
+	wires := [][]int{}
+	for _, choice := range choices {
+		wires = append(wires, m.Wirings[choice])
+	}
+	sum := map[int]int{}
+	for _, w := range wires {
+		for _, b := range w {
+			sum[b] = sum[b] + 1
+		}
+	}
+	failed := false
+	for i, on := range m.LightGoal {
+		if on && sum[i]%2 == 0 {
+			failed = true
+			break
+		}
+		if !on && sum[i]%2 != 0 {
+			failed = true
+			break
+		}
+	}
+	if failed {
+		return false, 0
+	}
+	return true, len(choices)
+}
+
+func subsets(bases []int) [][]int {
 	results := [][]int{}
-	combinations([]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, &results)
-	fmt.Println(len(results))
-}
-
-func combinationsRec(prefix []int, choices []int, skiplist []bool, skipped int, combos *[][]int) {
-	for i, choice := range choices {
-		newPrefix := slices.Clone(prefix)
-		newPrefix = append(newPrefix, choice)
-		*combos = append(*combos, newPrefix)
-
-		newChoices := slices.Clone(choices)
-		newChoices = append(newChoices[:i], newChoices[i+1:]...)
-
-		combinationsRec(newPrefix, newChoices, combos)
+	for _, b := range bases {
+		for _, result := range results {
+			copy := slices.Clone(result)
+			copy = append(copy, b)
+			results = append(results, copy)
+		}
+		results = append(results, []int{b})
 	}
-}
-
-func combinations(bases []int, combos *[][]int) {
-	skiplist := make([]bool, len(bases))
-	for i, b := range bases {
-		*combos = append(*combos, []int{b})
-		skiplist[i] = true
-		combinationsRec([]int{b}, bases, skiplist, i, combos)
-		skiplist[i] = false
-	}
+	return results
 }
