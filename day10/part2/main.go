@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strconv"
@@ -77,6 +78,7 @@ func main() {
 			VoltageGoal: voltages,
 		}
 		machines = append(machines, m)
+		fmt.Println(Search(m.VoltageGoal, m.Wirings, 0))
 	}
 }
 
@@ -88,11 +90,22 @@ func Search(voltages []int, wirings [][]int, presses int) int {
 	if solved {
 		return presses
 	}
+	subPress := []int{}
 	for _, w := range wirings {
 		newVoltage := slices.Clone(voltages)
 		VoltageApply(newVoltage, w)
-		Search(newVoltage, wirings, presses+1)
+		result := Search(newVoltage, wirings, presses+1)
+		if result > 0 {
+			subPress = append(subPress, result)
+		}
 	}
+	largest := -1
+	for _, p := range subPress {
+		if p > largest {
+			largest = p
+		}
+	}
+	return largest
 }
 
 func VoltageApply(voltages []int, wirings []int) {
