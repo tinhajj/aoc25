@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"slices"
@@ -115,33 +116,40 @@ func main() {
 		m.WiringsMaxPress = lvs
 
 		machines = append(machines, m)
+		memo := &Memo{Lookup: map[string]int{}}
+		ans, ok := Search(m.VoltageGoal, m.Wirings, memo)
+		fmt.Println(ans, ok)
 	}
 }
 
-func Search(voltages []int, wirings [][]int, presses int) int {
+func Search(voltages []int, wirings [][]int, memo *Memo) (int, bool) {
+	ans, ok := memo.Get(voltages)
+	if ok {
+		return ans, true
+	}
 	invalid, solved := VoltageStatus(voltages)
 	if invalid {
-		return -1
+		return 0, false
 	}
 	if solved {
-		return presses
+		return 0, true
 	}
-	subPress := []int{}
-	for _, w := range wirings {
-		newVoltage := slices.Clone(voltages)
-		VoltageApply(newVoltage, w)
-		result := Search(newVoltage, wirings, presses+1)
-		if result > 0 {
-			subPress = append(subPress, result)
+
+	smallest := math.MaxInt
+	for _, wire := range wirings {
+		subVoltage := slices.Clone(voltages)
+		VoltageApply(subVoltage, wire)
+		presses, solveable := Search(subVoltage, wirings, memo)
+		if solveable {
+			if presses+1 < smallest {
+				smallest = presses + 1
+			}
 		}
 	}
-	largest := -1
-	for _, p := range subPress {
-		if p > largest {
-			largest = p
-		}
+	if smallest != math.MaxInt {
+		memo.Add(voltages, smallest)
 	}
-	return largest
+	return smallest, smallest != math.MaxInt
 }
 
 func VoltageApply(voltages []int, wirings []int) {
@@ -155,11 +163,14 @@ func VoltageStatus(voltages []int) (invalid bool, solved bool) {
 		if v < 0 {
 			return true, false
 		}
+	}
 
+	for _, v := range voltages {
 		if v != 0 {
 			return false, false
 		}
 	}
+
 	return false, true
 }
 
