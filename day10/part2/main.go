@@ -1,3 +1,4 @@
+// https://old.reddit.com/r/adventofcode/comments/1pk87hl/2025_day_10_part_2_bifurcate_your_way_to_victory/
 package main
 
 import (
@@ -33,10 +34,9 @@ func (m *Memo) Get(voltage []int) (int, bool) {
 }
 
 type Machine struct {
-	LightGoal       []bool
-	VoltageGoal     []int
-	Wirings         [][]int
-	WiringsMaxPress []int
+	LightGoal   []bool
+	VoltageGoal []int
+	Wirings     [][]int
 }
 
 func main() {
@@ -103,58 +103,106 @@ func main() {
 			VoltageGoal: voltages,
 		}
 
-		lvs := []int{}
+		machines = append(machines, m)
 
-		for _, wiring := range m.Wirings {
-			relatedVoltages := []int{}
-			for _, wire := range wiring {
-				relatedVoltages = append(relatedVoltages, m.VoltageGoal[wire])
-			}
-			lvs = append(lvs, VoltageLowest(relatedVoltages))
+		bases := make([]int, len(m.Wirings))
+		for i := range bases {
+			bases[i] = i
 		}
 
-		m.WiringsMaxPress = lvs
+		sets := Subsets(bases)
 
-		machines = append(machines, m)
-		memo := &Memo{Lookup: map[string]int{}}
-		ans, ok := Search(m.VoltageGoal, m.Wirings, memo)
-		fmt.Println(ans, ok)
+		goal := VoltageToBool(m.VoltageGoal)
+
+		validWirings := ValidWirings(m, goal, sets)
+
+		smallest := math.MaxInt
+		for _, wiring := range validWirings {
+			x := Solve(m, sets, m.VoltageGoal, wiring)
+			if x < smallest {
+				smallest = x
+			}
+		}
+		fmt.Println(smallest)
 	}
 }
 
-func Search(voltages []int, wirings [][]int, memo *Memo) (int, bool) {
-	ans, ok := memo.Get(voltages)
-	if ok {
-		return ans, true
+func VoltageToBool(voltages []int) []bool {
+	goal := []bool{}
+	for _, v := range voltages {
+		switch v%2 == 0 {
+		case true:
+			goal = append(goal, false)
+		case false:
+			goal = append(goal, true)
+		}
 	}
-	invalid, solved := VoltageStatus(voltages)
+	return goal
+}
+
+func ValidWirings(m Machine, goal []bool, sets [][]int) [][][]int {
+	valid := [][][]int{}
+	for _, set := range sets {
+		ok, _ := ValidSubset(m, goal, set)
+		if ok {
+			wires := [][]int{}
+			for _, i := range set {
+				wires = append(wires, m.Wirings[i])
+			}
+			valid = append(valid, wires)
+		}
+	}
+	return valid
+}
+
+func Solve(m Machine, sets [][]int, voltages []int, wiring [][]int) int {
+	subVoltages := slices.Clone(voltages)
+
+	presses := 0
+	for _, w := range wiring {
+		VoltageApply(subVoltages, w, 1)
+	}
+	presses += len(wiring)
+
+	invalid, solved := VoltageStatus(subVoltages)
 	if invalid {
-		return 0, false
+		return 1_000_000
 	}
 	if solved {
-		return 0, true
+		return presses
+	}
+
+	VoltageDivide(subVoltages)
+	fmt.Println(subVoltages)
+
+	subWirings := ValidWirings(m, VoltageToBool(subVoltages), sets)
+	if len(subWirings) < 1 {
+		return 1_000_000
 	}
 
 	smallest := math.MaxInt
-	for _, wire := range wirings {
-		subVoltage := slices.Clone(voltages)
-		VoltageApply(subVoltage, wire)
-		presses, solveable := Search(subVoltage, wirings, memo)
-		if solveable {
-			if presses+1 < smallest {
-				smallest = presses + 1
-			}
+	for _, w := range subWirings {
+		subPresses := Solve(m, sets, subVoltages, w)
+		x := (subPresses * 2) + presses
+		if x < smallest {
+			smallest = x
 		}
 	}
-	if smallest != math.MaxInt {
-		memo.Add(voltages, smallest)
-	}
-	return smallest, smallest != math.MaxInt
+
+	return smallest
 }
 
-func VoltageApply(voltages []int, wirings []int) {
-	for _, w := range wirings {
-		voltages[w] -= 1
+func VoltageApply(voltages []int, wirings []int, times int) {
+	for i := 0; i < times; i++ {
+		for _, w := range wirings {
+			voltages[w] -= 1
+		}
+	}
+}
+
+func VoltageDivide(voltages []int) {
+	for i := range voltages {
+		voltages[i] = voltages[i] / 2
 	}
 }
 
@@ -182,4 +230,58 @@ func VoltageLowest(voltages []int) int {
 		}
 	}
 	return lowest
+}
+
+func Subsets(bases []int) [][]int {
+	results := [][]int{}
+	for _, b := range bases {
+		for _, result := range results {
+			copy := slices.Clone(result)
+			copy = append(copy, b)
+			results = append(results, copy)
+		}
+		results = append(results, []int{b})
+	}
+	return results
+}
+
+func ValidSubset(m Machine, goal []bool, choices []int) (bool, int) {
+	allFalse := true
+
+	for _, g := range goal {
+		if g == true {
+			allFalse = false
+			break
+		}
+	}
+
+	if allFalse {
+		return true, 0
+	}
+
+	wires := [][]int{}
+	for _, choice := range choices {
+		wires = append(wires, m.Wirings[choice])
+	}
+	sum := map[int]int{}
+	for _, w := range wires {
+		for _, b := range w {
+			sum[b] = sum[b] + 1
+		}
+	}
+	failed := false
+	for i, on := range goal {
+		if on && sum[i]%2 == 0 {
+			failed = true
+			break
+		}
+		if !on && sum[i]%2 != 0 {
+			failed = true
+			break
+		}
+	}
+	if failed {
+		return false, 0
+	}
+	return true, len(choices)
 }
