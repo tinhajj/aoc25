@@ -40,8 +40,8 @@ type Machine struct {
 }
 
 func main() {
-	// b, err := os.ReadFile("day_10_input.txt")
-	b, err := os.ReadFile("day_10_sample_input.txt")
+	b, err := os.ReadFile("day_10_input.txt")
+	// b, err := os.ReadFile("day_10_sample_input.txt")
 	if err != nil {
 		panic(err)
 	}
@@ -52,6 +52,7 @@ func main() {
 
 	machines := []Machine{}
 
+	sum := 0
 	for _, line := range lines {
 		start := strings.Index(line, "[")
 		end := strings.Index(line, "]")
@@ -112,19 +113,11 @@ func main() {
 
 		sets := Subsets(bases)
 
-		goal := VoltageToBool(m.VoltageGoal)
-
-		validWirings := ValidWirings(m, goal, sets)
-
-		smallest := math.MaxInt
-		for _, wiring := range validWirings {
-			x := Solve(m, sets, m.VoltageGoal, wiring)
-			if x < smallest {
-				smallest = x
-			}
-		}
-		fmt.Println(smallest)
+		x := Solve(m, sets, m.VoltageGoal)
+		sum += x
+		fmt.Println(x)
 	}
+	fmt.Println("Sum:", sum)
 }
 
 func VoltageToBool(voltages []int) []bool {
@@ -143,7 +136,7 @@ func VoltageToBool(voltages []int) []bool {
 func ValidWirings(m Machine, goal []bool, sets [][]int) [][][]int {
 	valid := [][][]int{}
 	for _, set := range sets {
-		ok, _ := ValidSubset(m, goal, set)
+		ok := ValidSubset(m, goal, set)
 		if ok {
 			wires := [][]int{}
 			for _, i := range set {
@@ -155,46 +148,50 @@ func ValidWirings(m Machine, goal []bool, sets [][]int) [][][]int {
 	return valid
 }
 
-func Solve(m Machine, sets [][]int, voltages []int, wiring [][]int) int {
-	subVoltages := slices.Clone(voltages)
+func Solve(m Machine, sets [][]int, voltages []int) int {
+	result := 1_000_000
 
-	presses := 0
-	for _, w := range wiring {
-		VoltageApply(subVoltages, w, 1)
-	}
-	presses += len(wiring)
-
-	invalid, solved := VoltageStatus(subVoltages)
-	if invalid {
-		return 1_000_000
-	}
-	if solved {
-		return presses
+	if VoltageEmpty(voltages) {
+		return 0
 	}
 
-	VoltageDivide(subVoltages)
-	fmt.Println(subVoltages)
-
-	subWirings := ValidWirings(m, VoltageToBool(subVoltages), sets)
-	if len(subWirings) < 1 {
-		return 1_000_000
+	subWirings := ValidWirings(m, VoltageToBool(voltages), sets)
+	if VoltageAllEven(voltages) {
+		subWirings = append(subWirings, [][]int{})
 	}
 
-	smallest := math.MaxInt
-	for _, w := range subWirings {
-		subPresses := Solve(m, sets, subVoltages, w)
-		x := (subPresses * 2) + presses
-		if x < smallest {
-			smallest = x
+	for _, wiring := range subWirings {
+		subVoltages := slices.Clone(voltages)
+		VoltageApply(subVoltages, wiring)
+
+		if VoltageInvalid(subVoltages) {
+			continue
 		}
+
+		VoltageDivide(subVoltages)
+		subPresses := Solve(m, sets, subVoltages)
+		if subPresses >= 1_000_000 {
+			continue
+		}
+		x := len(wiring) + (subPresses * 2)
+		result = min(result, x)
 	}
 
-	return smallest
+	return result
 }
 
-func VoltageApply(voltages []int, wirings []int, times int) {
-	for i := 0; i < times; i++ {
-		for _, w := range wirings {
+func VoltageAllEven(voltages []int) bool {
+	for _, v := range voltages {
+		if v%2 != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func VoltageApply(voltages []int, wirings [][]int) {
+	for _, wiring := range wirings {
+		for _, w := range wiring {
 			voltages[w] -= 1
 		}
 	}
@@ -206,20 +203,22 @@ func VoltageDivide(voltages []int) {
 	}
 }
 
-func VoltageStatus(voltages []int) (invalid bool, solved bool) {
-	for _, v := range voltages {
-		if v < 0 {
-			return true, false
-		}
-	}
-
+func VoltageEmpty(voltages []int) bool {
 	for _, v := range voltages {
 		if v != 0 {
-			return false, false
+			return false
 		}
 	}
+	return true
+}
 
-	return false, true
+func VoltageInvalid(voltages []int) bool {
+	for _, v := range voltages {
+		if v < 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func VoltageLowest(voltages []int) int {
@@ -245,20 +244,7 @@ func Subsets(bases []int) [][]int {
 	return results
 }
 
-func ValidSubset(m Machine, goal []bool, choices []int) (bool, int) {
-	allFalse := true
-
-	for _, g := range goal {
-		if g == true {
-			allFalse = false
-			break
-		}
-	}
-
-	if allFalse {
-		return true, 0
-	}
-
+func ValidSubset(m Machine, goal []bool, choices []int) bool {
 	wires := [][]int{}
 	for _, choice := range choices {
 		wires = append(wires, m.Wirings[choice])
@@ -281,7 +267,7 @@ func ValidSubset(m Machine, goal []bool, choices []int) (bool, int) {
 		}
 	}
 	if failed {
-		return false, 0
+		return false
 	}
-	return true, len(choices)
+	return true
 }
