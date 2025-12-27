@@ -8,9 +8,8 @@ import (
 )
 
 type Memo struct {
-	HitsFft   bool
-	HitsDac   bool
-	WaysToEnd int
+	FindsFft bool
+	FindsDac bool
 }
 
 func main() {
@@ -34,28 +33,27 @@ func main() {
 		adj[device] = strings.Split(outputs, " ")[1:]
 	}
 
-	result, _, _ := dfs(adj, map[string]bool{}, map[string]Memo{}, "svr", "out")
+	visited := map[string]bool{}
+	cache := map[string]Memo{}
+	_ = cache
+
+	result, _, _ := dfs(adj, visited, "svr", "out")
 	fmt.Println(time.Since(start))
 
 	fmt.Println(result)
 }
 
-func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo, start string, goal string) (int, bool, bool) {
+func dfs(adj map[string][]string, visited map[string]bool, start string, goal string) (int, bool, bool) {
+	if start == "fft" {
+		fmt.Println("found fft")
+	}
+
 	if start == goal {
 		if visited["fft"] && visited["dac"] {
+			fmt.Println("found one")
 			return 1, true, true
 		}
 		return 0, false, false
-	}
-
-	memo, ok := cache[start]
-	if ok {
-		if !visited["fft"] && !memo.HitsFft {
-			return 0, memo.HitsFft, memo.HitsDac
-		}
-		if !visited["dac"] && !memo.HitsDac {
-			return 0, memo.HitsFft, memo.HitsDac
-		}
 	}
 
 	visited[start] = true
@@ -63,20 +61,16 @@ func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo
 	neighbors := adj[start]
 	sum := 0
 
-	hitsFft := visited["fft"]
-	hitsDac := visited["dac"]
-
 	for _, n := range neighbors {
 		if visited[n] {
+			fmt.Println("hmm")
 			continue
 		}
-		result, hitFft, hitDac := dfs(adj, visited, cache, n, goal)
-		hitsFft = hitsFft || hitFft
-		hitsDac = hitsDac || hitDac
+		result, _, _ := dfs(adj, visited, n, goal)
 		sum += result
 	}
 
 	visited[start] = false
 
-	return sum, hitsFft, hitsDac
+	return sum, false, false
 }
