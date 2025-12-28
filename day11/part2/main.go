@@ -10,6 +10,11 @@ import (
 type Memo struct {
 	FindsFft bool
 	FindsDac bool
+
+	WaysToEndThroughBoth int
+	WaysToEndThroughDac  int
+	WaysToEndThroughFft  int
+	WaysToEnd            int
 }
 
 func main() {
@@ -36,37 +41,30 @@ func main() {
 	visited := map[string]bool{}
 	cache := map[string]Memo{}
 
-	result, _ := dfs(adj, visited, cache, "svr", "out")
+	result, _, _ := dfs(adj, visited, cache, "svr", "out")
 	fmt.Println(time.Since(start))
 
 	fmt.Println(result)
 }
 
-func copy(input map[string]bool) map[string]bool {
-	result := map[string]bool{}
-	for k, v := range input {
-		result[k] = v
-	}
-	return result
-}
-
 var largest = 0
 
-func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo, start string, goal string) (int, map[string]bool) {
+func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo, start string, goal string) (int, int, map[string]bool) {
 	visits := map[string]bool{}
 	visits[start] = true
 
 	if start == goal {
 		if visited["fft"] && visited["dac"] {
-			return 1, visits
+			return 1, 1, visits
 		}
-		return 0, visits
+		return 0, 1, visits
 	}
 
 	visited[start] = true
 
 	neighbors := adj[start]
-	sum := 0
+	sumThroughFftAndDac := 0
+	sumGoal := 0
 
 	for _, n := range neighbors {
 		if visited[n] {
@@ -82,13 +80,19 @@ func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo
 			if !visited["dac"] && !memo.FindsDac {
 				continue
 			}
+			if visited["dac"] && visited["fft"] {
+				sumThroughFftAndDac += memo.WaysToEndThroughBoth
+				sumGoal += memo.WaysToEnd
+				continue
+			}
 		}
 
-		result, subVisits := dfs(adj, visited, cache, n, goal)
+		resultThroughFftAndDac, resultGoal, subVisits := dfs(adj, visited, cache, n, goal)
 		for k, v := range subVisits {
 			visits[k] = v
 		}
-		sum += result
+		sumThroughFftAndDac += resultThroughFftAndDac
+		sumGoal += resultGoal
 	}
 
 	visited[start] = false
@@ -104,14 +108,16 @@ func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo
 	}
 
 	cache[start] = Memo{
-		FindsFft: visits["fft"] || vf,
-		FindsDac: visits["dac"] || vd,
+		FindsFft:             visits["fft"] || vf,
+		FindsDac:             visits["dac"] || vd,
+		WaysToEndThroughBoth: sumThroughFftAndDac,
+		WaysToEnd:            sumGoal,
 	}
 
-	if sum > largest {
-		largest = sum
-		fmt.Println(sum)
+	if sumThroughFftAndDac > largest {
+		largest = sumThroughFftAndDac
+		fmt.Println(sumThroughFftAndDac)
 	}
 
-	return sum, visits
+	return sumThroughFftAndDac, sumGoal, visits
 }
