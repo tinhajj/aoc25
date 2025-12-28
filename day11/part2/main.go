@@ -35,25 +35,32 @@ func main() {
 
 	visited := map[string]bool{}
 	cache := map[string]Memo{}
-	_ = cache
 
-	result, _, _ := dfs(adj, visited, "svr", "out")
+	result, _ := dfs(adj, visited, cache, "svr", "out")
 	fmt.Println(time.Since(start))
 
 	fmt.Println(result)
 }
 
-func dfs(adj map[string][]string, visited map[string]bool, start string, goal string) (int, bool, bool) {
-	if start == "fft" {
-		fmt.Println("found fft")
+func copy(input map[string]bool) map[string]bool {
+	result := map[string]bool{}
+	for k, v := range input {
+		result[k] = v
 	}
+	return result
+}
+
+var largest = 0
+
+func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo, start string, goal string) (int, map[string]bool) {
+	visits := map[string]bool{}
+	visits[start] = true
 
 	if start == goal {
 		if visited["fft"] && visited["dac"] {
-			fmt.Println("found one")
-			return 1, true, true
+			return 1, visits
 		}
-		return 0, false, false
+		return 0, visits
 	}
 
 	visited[start] = true
@@ -63,14 +70,48 @@ func dfs(adj map[string][]string, visited map[string]bool, start string, goal st
 
 	for _, n := range neighbors {
 		if visited[n] {
-			fmt.Println("hmm")
-			continue
+			panic("loop back, didn't expect")
 		}
-		result, _, _ := dfs(adj, visited, n, goal)
+
+		memo, ok := cache[n]
+
+		if ok {
+			if !visited["fft"] && !memo.FindsFft {
+				continue
+			}
+			if !visited["dac"] && !memo.FindsDac {
+				continue
+			}
+		}
+
+		result, subVisits := dfs(adj, visited, cache, n, goal)
+		for k, v := range subVisits {
+			visits[k] = v
+		}
 		sum += result
 	}
 
 	visited[start] = false
 
-	return sum, false, false
+	vf := false
+	vd := false
+	for _, n := range neighbors {
+		memo, ok := cache[n]
+		if ok {
+			vf = vf || memo.FindsFft
+			vd = vd || memo.FindsDac
+		}
+	}
+
+	cache[start] = Memo{
+		FindsFft: visits["fft"] || vf,
+		FindsDac: visits["dac"] || vd,
+	}
+
+	if sum > largest {
+		largest = sum
+		fmt.Println(sum)
+	}
+
+	return sum, visits
 }
