@@ -8,19 +8,18 @@ import (
 )
 
 type Memo struct {
-	FindsFft bool
-	FindsDac bool
+	Visited map[string]bool
 
-	WaysToEndThroughBoth int
-	WaysToEndThroughDac  int
-	WaysToEndThroughFft  int
-	WaysToEnd            int
+	WaysGoal int
+	WaysFft  int
+	WaysDac  int
+	WaysBoth int
 }
 
 func main() {
 	start := time.Now()
-	b, err := os.ReadFile("day_11_input.txt")
-	// b, err := os.ReadFile("day_11_sample_input.txt")
+	// b, err := os.ReadFile("day_11_input.txt")
+	b, err := os.ReadFile("day_11_sample_input.txt")
 	if err != nil {
 		panic(err)
 	}
@@ -41,30 +40,27 @@ func main() {
 	visited := map[string]bool{}
 	cache := map[string]Memo{}
 
-	result, _, _ := dfs(adj, visited, cache, "svr", "out")
+	goalWays, fftWays, dacWays, bothWays, _ := dfs(adj, visited, cache, "svr", "out")
 	fmt.Println(time.Since(start))
 
-	fmt.Println(result)
+	fmt.Println(goalWays, fftWays, dacWays, bothWays)
 }
 
 var largest = 0
 
-func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo, start string, goal string) (int, int, map[string]bool) {
+func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo, start string, goal string) (waysAny, waysFft, waysDac, waysBoth int, v map[string]bool) {
 	visits := map[string]bool{}
 	visits[start] = true
 
 	if start == goal {
-		if visited["fft"] && visited["dac"] {
-			return 1, 1, visits
-		}
-		return 0, 1, visits
+		return 1, 0, 0, 0, visits
 	}
 
 	visited[start] = true
 
 	neighbors := adj[start]
-	sumThroughFftAndDac := 0
-	sumGoal := 0
+
+	var outerWaysAny, outerWaysFft, outerWaysDac, outerWaysBoth int
 
 	for _, n := range neighbors {
 		if visited[n] {
@@ -73,26 +69,50 @@ func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo
 
 		memo, ok := cache[n]
 
+		var subVisits map[string]bool
+
 		if ok {
-			if !visited["fft"] && !memo.FindsFft {
-				continue
+			if visited["fft"] && visited["dac"] {
+				outerWaysAny += memo.WaysGoal
+				outerWaysFft += memo.WaysGoal
+				outerWaysDac += memo.WaysGoal
+				outerWaysBoth += memo.WaysGoal
 			}
-			if !visited["dac"] && !memo.FindsDac {
-				continue
+
+			if visited["fft"] {
+				outerWaysAny += memo.WaysGoal
+				outerWaysFft += memo.WaysGoal
+				outerWaysDac += memo.WaysDac
+				outerWaysBoth += memo.WaysDac
 			}
-			if visited["dac"] && visited["fft"] {
-				sumThroughFftAndDac += memo.WaysToEndThroughBoth
-				sumGoal += memo.WaysToEnd
-				continue
+
+			if visited["dac"] {
+				outerWaysAny += memo.WaysGoal
+				outerWaysDac += memo.WaysGoal
+				outerWaysFft += memo.WaysFft
+				outerWaysBoth += memo.WaysFft
+			}
+
+			if !visited["dac"] && !visited["fft"] {
+				outerWaysAny += memo.WaysGoal
+				outerWaysDac += memo.WaysDac
+				outerWaysFft += memo.WaysFft
+				outerWaysBoth += memo.WaysBoth
 			}
 		}
 
-		resultThroughFftAndDac, resultGoal, subVisits := dfs(adj, visited, cache, n, goal)
+		if !ok {
+			goalWays, fftWays, dacWays, bothWays, subVisits = dfs(adj, visited, cache, n, goal)
+
+			outerGoalWays += goalWays
+			outerFftWays += fftWays
+			outerDacWays += dacWays
+			outerBothWays += bothWays
+		}
+
 		for k, v := range subVisits {
 			visits[k] = v
 		}
-		sumThroughFftAndDac += resultThroughFftAndDac
-		sumGoal += resultGoal
 	}
 
 	visited[start] = false
@@ -102,22 +122,20 @@ func dfs(adj map[string][]string, visited map[string]bool, cache map[string]Memo
 	for _, n := range neighbors {
 		memo, ok := cache[n]
 		if ok {
-			vf = vf || memo.FindsFft
-			vd = vd || memo.FindsDac
+			vf = vf || memo.Visited["fft"]
+			vd = vd || memo.Visited["dac"]
+		}
+		for k, v := range memo.Visited {
+			visits[k] = v
 		}
 	}
 
 	cache[start] = Memo{
-		FindsFft:             visits["fft"] || vf,
-		FindsDac:             visits["dac"] || vd,
-		WaysToEndThroughBoth: sumThroughFftAndDac,
-		WaysToEnd:            sumGoal,
+		WaysGoal: outerGoalWays,
+		WaysFft:  outerFftWays,
+		WaysDac:  outerDacWays,
+		Visited:  visits,
 	}
 
-	if sumThroughFftAndDac > largest {
-		largest = sumThroughFftAndDac
-		fmt.Println(sumThroughFftAndDac)
-	}
-
-	return sumThroughFftAndDac, sumGoal, visits
+	return outerGoalWays, outerFftWays, outerDacWays, outerBothWays, visits
 }
